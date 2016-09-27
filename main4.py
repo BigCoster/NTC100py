@@ -56,13 +56,11 @@ with Serial(comport, 57600, timeout=15) as ser:
         # logging.warning("get data: {}".format(inbytes))
 
         if inbytes:
-            print(datetime.now(),inbytes)
-            logging.warning(inbytes)
+            recived_data = inbytes
             try:
                 inbytes = inbytes.decode("ascii")
-                # print("Input data: ", inbytes.strip())
-                # print(inbytes.strip())
-
+                print(datetime.now(),inbytes.strip())
+                logging.warning(inbytes.strip())
                 try:
                     data = json.loads(inbytes)
                     # print(json.dumps(data, sort_keys=True, indent=None))
@@ -79,19 +77,25 @@ with Serial(comport, 57600, timeout=15) as ser:
                         # print(MySeriesHelper._json_body_())
 
                         # To manually submit data points which are not yet written, call commit:
-                        MySeriesHelper.commit()
-
+                        try:
+                            MySeriesHelper.commit()
+                        except Exception as msg:
+                            print(msg)
                     # print("Read ast_dataFrame")
                     # data = myclient.query("select * from NTC100")
                     # print(data)
                     else: 
-                        print ('dubbled data')
-                except Exception:
-                    print('Corrupted json.')
-                    logging.warning('Corrupted json.')
-            except Exception:
-                print('Corrupted ascii.')
-                logging.warning('Corrupted ascii.')
+                       print ('duplicated data')
+                except Exception as msg:
+                    print('Corrupted json')
+                    print(msg)
+                    logging.warning('Corrupted json')
+                    logging.warning(msg)
+            except Exception as msg:
+                print(datetime.now(),recived_data,' <- Corrupted ascii.')
+                print(msg)
+                logging.warning(recived_data, ' <- Corrupted ascii.')
+                logging.warning(msg)
         # else:
         #     print('Empty data.')
         time.sleep(1)
