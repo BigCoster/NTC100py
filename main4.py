@@ -8,9 +8,13 @@ from os import path
 import logging
 from configparser import ConfigParser
 
-logging.basicConfig(filename='NTC100 '+datetime.now().strftime("%H%M%S")+'.log',
-                    level=logging.WARNING, format='%(asctime)s %(message)s',
-                    datefmt='%m.%d.%Y %H:%M:%S')
+def timenow():
+    return datetime.now().strftime('%m.%d.%Y %H:%M:%S')
+
+logging.basicConfig(filename='NTC100.log', level=logging.WARNING,
+                    format='%(asctime)s %(message)s',datefmt='%m.%d.%Y %H:%M:%S')
+print(timenow(), 'Start application')
+logging.warning('Start application')
 config = ConfigParser()
 # def values:
 config['influxdb'] = {'host': 'localhost', 'port': '8086', 'user': 'root',
@@ -18,8 +22,7 @@ config['influxdb'] = {'host': 'localhost', 'port': '8086', 'user': 'root',
 config['comport'] = {'name': 'COM1', 'boudrate': '57600'}
 config['logging'] = {'enabled':'True'}
 
-def timenow():
-    return datetime.now().strftime('%m.%d.%Y %H:%M:%S')
+
 
 if not path.exists('config.ini'):
     print(timenow(), 'No config! It will be created with def values...')
@@ -34,6 +37,7 @@ myclient = InfluxDBClient(config['influxdb']['host'], config['influxdb']['port']
                           config['influxdb']['db'])
 
 tmp_data = {}
+start_msg = 'Start firmware\r\n'
 
 class MySeriesHelper(SeriesHelper):
     # Meta class stores time series helper configuration.
@@ -61,27 +65,28 @@ try:
                 inbytes = inbytes.decode("ascii")
                 print(timenow(), inbytes.strip())
                 logging.warning(inbytes.strip())
-                try:
-                    data = json.loads(inbytes)
-                    if data != tmp_data:
-                        tmp_data = data
-                        for dev in sorted(data):
-                            MySeriesHelper(dev_addr=dev, curr_temp=data[dev][0], task_temp=data[dev][1],
-                                           curr_work=data[dev][2], frame=data[dev][3], time_resp=data[dev][4],
-                                           dev_resp=data[dev][5])
-                        try:
-                            MySeriesHelper.commit()
-                        except Exception as msg:
-                            print(timenow(), msg)
-                            logging.error(msg)
-                    else: 
-                        print (timenow(),'^ Dublicated data, not write in db')
-                        logging.warning('^ Dublicated data, not write in db')
-                except Exception as msg:
-                    print(timenow(),'^ Corrupted json')
-                    print(timenow(), msg)
-                    logging.warning('^ Corrupted json')
-                    logging.warning(msg)
+                if not (inbytes == start_msg): 
+	                try:
+	                    data = json.loads(inbytes)
+	                    if data != tmp_data:
+	                        tmp_data = data
+	                        for dev in sorted(data):
+	                            MySeriesHelper(dev_addr=dev, curr_temp=data[dev][0], task_temp=data[dev][1],
+	                                           curr_work=data[dev][2], frame=data[dev][3], time_resp=data[dev][4],
+	                                           dev_resp=data[dev][5])
+	                        try:
+	                            MySeriesHelper.commit()
+	                        except Exception as msg:
+	                            print(timenow(), msg)
+	                            logging.error(msg)
+	                    else: 
+	                        print (timenow(),'^ Dublicated data, not write in db')
+	                        logging.warning('^ Dublicated data, not write in db')
+	                except Exception as msg:
+	                    print(timenow(),'^ Corrupted json')
+	                    print(timenow(), msg)
+	                    logging.warning('^ Corrupted json')
+	                    logging.warning(msg)
             except Exception as msg:
                 print(timenow(),'^ Corrupted ascii')
                 print(timenow(),msg)
