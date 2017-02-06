@@ -2,23 +2,20 @@ import time
 import json
 from influxdb import InfluxDBClient
 from influxdb import SeriesHelper
-from datetime import datetime
 from serial import Serial
 from os import path
-import logging
 import logging.handlers
 from configparser import ConfigParser
+import sys
 
-#conf logging
-levels = {'debug':logging.DEBUG, 'info':logging.INFO, 'warning':logging.WARNING,
-          'error':logging.ERROR, 'critical':logging.CRITICAL}
+# conf logging
+levels = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING, 'ERROR': logging.ERROR}
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s', datefmt='%m.%d.%Y %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s', datefmt='%d.%m.%Y %H:%M:%S')
 console = logging.StreamHandler()
 console.setFormatter(formatter)
-# filehandler = logging.FileHandler('NTC1001.log')
-filehandler = logging.handlers.RotatingFileHandler('NTC1001.log', maxBytes=1024000, backupCount=5)
+filehandler = logging.handlers.RotatingFileHandler('NTC100.log', maxBytes=1048576, backupCount=5)
 # filehandler = logging.handlers.TimedRotatingFileHandler('NTC1001.log', when='M', backupCount=7)
 
 filehandler.setFormatter(formatter)
@@ -27,13 +24,12 @@ log.addHandler(filehandler)
 
 log.info('Start application')
 
-
 config = ConfigParser()
 # def values:
 config['influxdb'] = {'host': 'localhost', 'port': '8086', 'user': 'root',
-                      'pass': 'root', 'db': 'mydb','retention_days':'30'}
+                      'pass': 'root', 'db': 'mydb', 'retention_days': '30'}
 config['comport'] = {'name': 'COM1', 'boudrate': '57600'}
-config['logging'] = {'level':'info'}
+config['logging'] = {'level': 'INFO', '; available levels' : ','.join(levels.keys())}
 
 if not path.exists('config.ini'):
     log.warning('No config! It will be created with def values...')
@@ -41,8 +37,8 @@ if not path.exists('config.ini'):
         config.write(configfile)
 else:
     config.read('config.ini')
-log.info('Logging level: ' + config['logging']['level'].upper())
-log.setLevel(levels[config['logging']['level']])
+log.info('Logging level: ' + config['logging']['level'])
+log.setLevel(config['logging']['level'])
 
 
 myclient = InfluxDBClient(config['influxdb']['host'], config['influxdb']['port'],
@@ -50,7 +46,8 @@ myclient = InfluxDBClient(config['influxdb']['host'], config['influxdb']['port']
                           config['influxdb']['db'])
 
 tmp_data = {}
-start_msg = 'Start firmware\r\n'
+msges = ['Start', 'Reset', 'Onboa']
+
 
 class MySeriesHelper(SeriesHelper):
     # Meta class stores time series helper configuration.
@@ -76,16 +73,16 @@ try:
         if inbytes:
             try:
                 inbytes = inbytes.decode("ascii")
-                log.info(inbytes.strip())
-                if not (inbytes == start_msg): 
+                if not (inbytes[:5] in msges):
+                    log.debug(inbytes.strip())
                     try:
                         data = json.loads(inbytes.strip())
                         if data != tmp_data:
                             tmp_data = data
                             for dev in sorted(data):
                                 MySeriesHelper(dev_addr=dev, curr_temp=data[dev][0], task_temp=data[dev][1],
-	                                           curr_work=data[dev][2], frame=data[dev][3], time_resp=data[dev][4],
-	                                           dev_resp=data[dev][5])
+                                               curr_work=data[dev][2], frame=data[dev][3], time_resp=data[dev][4],
+                                               dev_resp=data[dev][5])
                             try:
                                 MySeriesHelper.commit()
                             except Exception as msg:
@@ -96,11 +93,13 @@ try:
                     except Exception as msg:
                         log.warning('Corrupted json -> ' + inbytes.strip())
                         log.warning(msg)
+                else:
+                    log.info(inbytes.strip())
             except Exception as msg:
-                log.warning('Corrupted ascii -> ' + comm_data)
+                log.warning('Corrupted ascii -> ' + repr(comm_data))
                 log.warning(msg)
         time.sleep(1)
 except Exception as msg:
     log.error('Can`t open ' + config['comport']['name'])
     log.error(msg)
-quit()
+sys.exit()
