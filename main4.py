@@ -7,6 +7,7 @@ from os import path
 import logging.handlers
 from configparser import ConfigParser
 import sys
+from list_serial_ports import serial_ports
 
 # conf logging
 levels = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING, 'ERROR': logging.ERROR}
@@ -102,4 +103,5 @@ try:
 except Exception as msg:
     log.error('Can`t open ' + config['comport']['name'])
     log.error(msg)
+    log.error('Available ports: %s.', ', '.join(serial_ports()))
 sys.exit()
